@@ -2750,7 +2750,7 @@ ibuffer for buffers.
 The key t is also allowed in the alist, and the corresponding
 value indicates the default function to use for other types.  The
 default is `embark-collect'"
-  :type '(alist :key-type symbol :value-type function))
+  :type '(alist :key-type symbol :value-type (choice function (repeat function))))
 
 (defcustom embark-after-export-hook nil
   "Hook run after `embark-export' in the newly created buffer."
@@ -3382,6 +3382,15 @@ buffer."
          (type (plist-get transformed :type)))
     (let ((exporter (or (alist-get type embark-exporters-alist)
                         (alist-get t embark-exporters-alist))))
+      (when (consp exporter)
+        (setq exporter (pcase current-prefix-arg
+                         ('nil (car exporter))
+                         (`(,num)
+                          (setq num (% (round (log num 4)) (length exporter)))
+                          (nth num exporter))
+                         (num
+                          (setq num (% num (length exporter)))
+                          (nth num exporter)))))
       (if (eq exporter 'embark-collect)
           (embark-collect)
         (let* ((after embark-after-export-hook)
