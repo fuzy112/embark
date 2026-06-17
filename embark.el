@@ -1100,11 +1100,15 @@ their own target finder.  See for example
 This does not take into account the default action, help key or
 cycling bindings, just what's registered in
 `embark-keymap-alist'."
-  (make-composed-keymap
-   (mapcar #'symbol-value
-           (let ((actions (or (alist-get type embark-keymap-alist)
-                              (alist-get t embark-keymap-alist))))
-             (ensure-list actions)))))
+  (cl-labels ((find-keymaps (type)
+                (or (ensure-list (alist-get type embark-keymap-alist))
+                    (cl-loop for p in (get type 'completion-category-parents)
+                             append (find-keymaps p)))))
+    (make-composed-keymap
+     (mapcar #'symbol-value
+             (let ((actions (or (find-keymaps type)
+                                (alist-get t embark-keymap-alist))))
+               (ensure-list actions))))))
 
 (defun embark--action-keymap (type cycle)
   "Return action keymap for targets of given TYPE.
