@@ -184,11 +184,9 @@ This function is meant to be added to `embark-collect-mode-hook'."
       (when (car entry)
         (consult--get-location (car entry))))))
 
-;; Set default `occur-mode' based exporter for consult-line,
-;; consult-line-multi, consult-outline and alike Another option is
-;; using grep-mode by using `embark-consult-export-location-grep'
 (setf (alist-get 'consult-location embark-exporters-alist)
-      #'embark-consult-export-location-occur)
+      (list #'embark-consult-export-location-occur
+            #'embark-consult-export-location-grep))
 (cl-pushnew #'embark-consult--upgrade-markers embark-collect-mode-hook)
 
 ;;; Support for consult-grep
