@@ -2760,6 +2760,21 @@ default is `embark-collect'"
   "Hook run after `embark-export' in the newly created buffer."
   :type 'hook)
 
+(defcustom embark-cycle-exporters nil
+  "How to select an exporter when \\[embark-export] is called with a prefix argument.
+
+When non-nil, a numeric prefix argument \\[universal-argument] N selects
+the Nth exporter, cycling through the list of exporters for the current
+completion type.  A plain \\[universal-argument] selects the second
+exporter, \\[universal-argument] \\[universal-argument] the third, and so on.
+
+When nil, \\[universal-argument] prompts for an exporter via
+`completing-read'.
+
+Without a prefix argument, the first exporter is always used regardless
+of this option."
+  :type 'boolean)
+
 (defface embark-collect-candidate '((t :inherit default))
   "Face for candidates in Embark Collect buffers.")
 
@@ -3363,6 +3378,28 @@ The parameter KIND should be either `embark-export' or `embark-collect'."
       (funcall embark--rerun-function)
     (user-error "No function to rerun collect or export found")))
 
+(defun embark--exporter (type)
+  (cl-labels ((get-exporters (type)
+                (append (ensure-list (alist-get type embark-exporters-alist))
+                        (mapcan #'get-exporters (get type 'completion-category-parents)))))
+    (let ((exporters (delete-dups (get-exporters type))))
+      (if (not current-prefix-arg)
+          (car exporters)
+        (if embark-cycle-exporters
+            (pcase current-prefix-arg
+              ('nil (car exporters))
+              (`(,(num))
+               (setq num (% (round (log num 4)) (length exporter)))
+               (nth num exporters))
+              (num
+               (setq num (% num (length exporters)))
+               (nth num exporters)))
+          (intern (completing-read "Exporter: "
+                                   (completion-table-with-metadata
+                                    exporters
+                                    '((category . function)))
+                                   nil t)))))))
+
 ;;;###autoload
 (defun embark-export ()
   "Create a type-specific buffer to manage current candidates.
@@ -3384,17 +3421,7 @@ buffer."
          (candidates (or (plist-get transformed :candidates)
                          (user-error "No candidates for export")))
          (type (plist-get transformed :type)))
-    (let ((exporter (or (alist-get type embark-exporters-alist)
-                        (alist-get t embark-exporters-alist))))
-      (when (consp exporter)
-        (setq exporter (pcase current-prefix-arg
-                         ('nil (car exporter))
-                         (`(,num)
-                          (setq num (% (round (log num 4)) (length exporter)))
-                          (nth num exporter))
-                         (num
-                          (setq num (% num (length exporter)))
-                          (nth num exporter)))))
+    (let ((exporter (embark--exporter type)))
       (if (eq exporter 'embark-collect)
           (embark-collect)
         (let* ((after embark-after-export-hook)
